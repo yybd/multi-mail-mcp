@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+# never commit OAuth secrets or tokens
+credentials.json
+accounts/
+*.token.json
