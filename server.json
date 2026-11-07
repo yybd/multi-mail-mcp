@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.yybd/multi-mail-mcp",
+  "title": "multi-mail",
+  "description": "Search, read, draft and send mail across several Gmail accounts. Bring your own OAuth client.",
+  "repository": {
+    "url": "https://github.com/yybd/multi-mail-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/yybd/multi-mail-mcp#readme",
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@yybd/multi-mail-mcp",
+      "version": "0.1.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "MULTI_MAIL_DEFAULT",
+          "description": "Account used when a tool call names none (email or alias)",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "MULTI_MAIL_HOME",
+          "description": "Folder holding credentials.json and account tokens (default ~/.multi-mail)",
+          "isRequired": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

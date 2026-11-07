@@ -1,6 +1,7 @@
 {
   "name": "@yybd/multi-mail-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "mcpName": "io.github.yybd/multi-mail-mcp",
   "description": "MCP server for reading, searching and writing mail across several Gmail accounts (Claude Desktop, Claude Code, ChatGPT)",
   "license": "MIT",
   "author": "yybd",

@@ -44,7 +44,7 @@ const gmailUrl = (account: string, id: string) =>
   `https://mail.google.com/mail/u/${encodeURIComponent(account)}/#all/${id}`;
 
 export function buildServer(): McpServer {
-  const server = new McpServer({ name: 'multi-mail', version: '0.1.0' }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: 'multi-mail', version: '0.1.1' }, { instructions: INSTRUCTIONS });
 
   const READ = { readOnlyHint: true, openWorldHint: false };
   const WRITE = { readOnlyHint: false, destructiveHint: false, openWorldHint: true };
