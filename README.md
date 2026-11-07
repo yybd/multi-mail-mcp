@@ -37,7 +37,7 @@ Each user brings **their own Google OAuth client**. Because of that, no Google a
 
 ## How it compares
 
-Checked on 2026-11-07, with star counts from that day. I couldn't find official documentation of what the built-in Claude and ChatGPT connectors can do. That information comes mostly from blog posts by competing vendors, so treat it as approximate.
+Checked on 2026-11-07, with star counts from that day, against web search and the [awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers) list. The closest alternatives were checked against their own READMEs. I couldn't find official documentation of what the built-in Claude and ChatGPT connectors can do. That information comes mostly from blog posts by competing vendors, so treat it as approximate.
 
 | Option | Several accounts | Sends | Claude Desktop / Code | ChatGPT | Where mail goes |
 |---|---|---|---|---|---|
@@ -47,14 +47,22 @@ Checked on 2026-11-07, with star counts from that day. I couldn't find official 
 | [Google's official Gmail MCP](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server) (developer preview) | not documented | **no send tool** | Claude | not listed | Google |
 | [google_workspace_mcp](https://github.com/taylorwilsdon/google_workspace_mcp) (~3.5k ⭐) | multi-*user*; several accounts of one person in one session isn't documented | yes | yes | yes (developer mode) | only you and Google |
 | [navbuildz/gmail-mcp-server](https://github.com/navbuildz/gmail-mcp-server) (16 ⭐) | yes, including `all` | yes | by URL | probably, untested | you, plus Redis |
+| [alexneamtu/gmail-mcp](https://github.com/alexneamtu/gmail-mcp) (4 ⭐) | yes, by alias | optional (a drafts-only mode) | remote only (Streamable HTTP) | not mentioned; documents Claude and Codex | only you and Google, but needs Node 24, Linux with systemd and an HTTPS hostname |
+| [kojott/mailmcp-dist](https://github.com/kojott/mailmcp-dist) (1 ⭐) | yes, any IMAP provider including Gmail | yes, allowlisted, plus attachments | yes (`.mcpb` or URL) | yes | your server, or their shared one; Gmail by app password over IMAP; **commercial licence** |
+| [orieg/gws-connector](https://github.com/orieg/gws-connector) (3 ⭐) | yes, routed by label, email or domain | yes | Claude Code and other local clients | not mentioned | only you and Google; Go, 49 tools across Gmail, Calendar, Drive, Sheets and more |
+| [honest-gmail-mcp](https://github.com/bartosz-kuc/honest-gmail-mcp) (0 ⭐) | one account per server instance; run several instances for several accounts | yes, with attachments | yes (stdio) | no | only you and Google |
 | [dmorrill/gmail-mcp-multi](https://github.com/dmorrill/gmail-mcp-multi), [jwlutz/gmail_connector](https://github.com/jwlutz/gmail_connector), [3vening/gmail-mcp](https://github.com/3vening/gmail-mcp) and others | yes | yes (some only after you opt in) | yes (stdio) | **no**, local only | only you and Google |
 | Composio / Zapier MCP / Pipedream | Composio: yes | yes | yes (URL) | yes (URL) | **through the vendor**, paid |
 
 **Takeaways:**
 - The built-in connectors don't give you several accounts plus sending in every client.
-- Most existing servers that handle several accounts run locally only, so ChatGPT can't connect to them.
+- Several self-hosted servers now handle more than one Gmail account. Each makes a different trade-off:
+  - alexneamtu/gmail-mcp is remote-only and needs a Linux server with an HTTPS hostname.
+  - mailmcp reaches Gmail over IMAP with app passwords, under a commercial licence.
+  - gws-connector covers the whole Workspace for local clients, without ChatGPT.
+  - Most of the rest run locally only, so ChatGPT can't connect to them.
 - Hosted brokers route your mail and tokens through a third party.
-- multi-mail covers all of this and keeps a narrow scope:
+- multi-mail's niche is one MIT-licensed `npx` package that runs locally over stdio and, when you want ChatGPT, over token-protected HTTP. It uses the Gmail API with your own OAuth client and keeps a narrow scope:
   - It has no delete permission.
   - Tokens stay on your machine with `600` permissions.
   - The HTTP server won't start without a token.

@@ -28,7 +28,7 @@
 
 ## למה עוד שרת — השוואה לקיים
 
-נבדק ב-2026-11-07. מספרי הכוכבים מאותו יום. את הנתונים על החיבורים המובנים של Claude ו-ChatGPT לא מצאתי בתיעוד רשמי, הם מבוססים בעיקר על בלוגים של ספקים מתחרים, ולכן כדאי לבדוק אותם מחדש.
+נבדק ב-2026-11-07, מול חיפוש ברשת ומול הרשימה [awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers). מספרי הכוכבים מאותו יום. את החלופות הקרובות ביותר בדקתי מול ה-README שלהן. את הנתונים על החיבורים המובנים של Claude ו-ChatGPT לא מצאתי בתיעוד רשמי, הם מבוססים בעיקר על בלוגים של ספקים מתחרים, ולכן כדאי לבדוק אותם מחדש.
 
 | אפשרות | כמה תיבות | שליחה | Claude Desktop / Code | ChatGPT | איפה עובר המייל |
 |---|---|---|---|---|---|
@@ -38,14 +38,22 @@
 | [השרת הרשמי של גוגל](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server) (Developer Preview) | לא מתועד | **אין כלי שליחה** | Claude | לא רשום | גוגל |
 | [google_workspace_mcp](https://github.com/taylorwilsdon/google_workspace_mcp) (~3.5k ⭐) | ריבוי *משתמשים*. כמה תיבות של אדם אחד באותו סשן לא מתועד | כן | כן | כן (Developer Mode) | רק אצלך ובגוגל |
 | [navbuildz/gmail-mcp-server](https://github.com/navbuildz/gmail-mcp-server) (16 ⭐) | כן, כולל `all` | כן | דרך URL | כנראה. לא נבדק | אצלך, ונדרש Redis |
+| [alexneamtu/gmail-mcp](https://github.com/alexneamtu/gmail-mcp) (4 ⭐) | כן, לפי כינוי | אופציונלית (יש מצב טיוטות בלבד) | רק מרחוק (Streamable HTTP) | לא מוזכר. מתועדים Claude ו-Codex | רק אצלך ובגוגל, אבל דורש Node 24, לינוקס עם systemd וכתובת HTTPS |
+| [kojott/mailmcp-dist](https://github.com/kojott/mailmcp-dist) (1 ⭐) | כן, כל ספק IMAP כולל Gmail | כן, לרשימת נמענים מאושרת, וגם קבצים מצורפים | כן (`.mcpb` או URL) | כן | השרת שלך, או השרת המשותף שלהם. Gmail דרך IMAP עם סיסמת אפליקציה. **רישיון מסחרי** |
+| [orieg/gws-connector](https://github.com/orieg/gws-connector) (3 ⭐) | כן, ניתוב לפי תווית, כתובת או דומיין | כן | ‏Claude Code ולקוחות מקומיים אחרים | לא מוזכר | רק אצלך ובגוגל. כתוב ב-Go, 49 כלים ל-Gmail, ‏Calendar, ‏Drive, ‏Sheets ועוד |
+| [honest-gmail-mcp](https://github.com/bartosz-kuc/honest-gmail-mcp) (0 ⭐) | חשבון אחד לכל מופע של השרת. לכמה תיבות מריצים כמה מופעים | כן, כולל קבצים מצורפים | כן (stdio) | לא | רק אצלך ובגוגל |
 | [dmorrill/gmail-mcp-multi](https://github.com/dmorrill/gmail-mcp-multi), [jwlutz/gmail_connector](https://github.com/jwlutz/gmail_connector), [3vening/gmail-mcp](https://github.com/3vening/gmail-mcp) ועוד | כן | כן, בחלקם רק אחרי הפעלה מפורשת | כן (stdio) | **לא**, מקומי בלבד | רק אצלך ובגוגל |
 | Composio / Zapier MCP / Pipedream | Composio: כן | כן | כן (URL) | כן (URL) | **דרך הספק**, בתשלום |
 
 **המסקנה:**
 - החיבורים המובנים לא מכסים כמה תיבות ושליחה בכל הלקוחות.
-- רוב השרתים הקיימים שתומכים בכמה תיבות רצים מקומית בלבד, ולכן ChatGPT לא יכול להתחבר אליהם.
+- כמה שרתים שמריצים אצלך כבר תומכים ביותר מתיבת Gmail אחת, וכל אחד מוותר על משהו אחר:
+  - ‏alexneamtu/gmail-mcp עובד רק מרחוק, וצריך בשבילו שרת לינוקס עם כתובת HTTPS.
+  - ‏mailmcp מגיע ל-Gmail דרך IMAP עם סיסמאות אפליקציה, ברישיון מסחרי.
+  - ‏gws-connector מכסה את כל Workspace ללקוחות מקומיים, בלי ChatGPT.
+  - רוב השאר רצים מקומית בלבד, ולכן ChatGPT לא יכול להתחבר אליהם.
 - השירותים המתווכים מעבירים את הדואר ואת הטוקנים דרך צד שלישי.
-- multi-mail משלב את כל אלה ונשאר צר:
+- הייחוד של multi-mail: חבילת `npx` אחת ברישיון MIT, שרצה מקומית ב-stdio, וכשרוצים ChatGPT גם ב-HTTP מוגן בטוקן. היא עובדת עם Gmail API ועם OAuth client משלך, ונשארת צרה:
   - בלי הרשאת מחיקה.
   - הטוקנים נשמרים מקומית בהרשאות `600`.
   - שרת ה-HTTP לא עולה בלי טוקן.
