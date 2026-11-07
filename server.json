@@ -35,6 +35,12 @@
           "description": "Set to off for drafts-only mode: no tool can send mail",
           "isRequired": false,
           "format": "string"
+        },
+        {
+          "name": "MULTI_MAIL_TZ",
+          "description": "IANA time zone for calendar tools, overriding each calendar's own setting",
+          "isRequired": false,
+          "format": "string"
         }
       ]
     }

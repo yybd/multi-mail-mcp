@@ -61,6 +61,20 @@ async function timeZoneOf(acc: Account): Promise<string> {
   return tz;
 }
 
+/** The zone to compute in: the tool's time_zone, then MULTI_MAIL_TZ, then the calendar's own setting. */
+async function zoneFor(acc: Account, override?: string): Promise<string> {
+  const tz = override?.trim() || process.env.MULTI_MAIL_TZ?.trim();
+  if (tz) {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: tz });
+    } catch {
+      throw new Error(`Unknown time zone "${tz}". Use an IANA name such as Asia/Jerusalem or Europe/London.`);
+    }
+    return tz;
+  }
+  return timeZoneOf(acc);
+}
+
 /** Minutes that `tz` is ahead of UTC at the instant `utcMs`. */
 export function tzOffsetMinutes(tz: string, utcMs: number): number {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -139,10 +153,11 @@ export async function listEvents(
   from: string,
   to: string,
   query: string | undefined,
-  maxResults: number
+  maxResults: number,
+  timeZone?: string
 ) {
   const accounts = accountsFor(accountSel);
-  const tz = await timeZoneOf(accounts[0]);
+  const tz = await zoneFor(accounts[0], timeZone);
   const timeMin = toInstant(from, tz).toISOString();
   const timeMax = toInstant(to, tz).toISOString();
   const errors: string[] = [];
@@ -264,10 +279,11 @@ export async function findFreeTime(
   accountSel: string | undefined,
   from: string,
   to: string,
-  opts: { minutes: number; dayStart: string; dayEnd: string; weekdays: number[]; maxSlots: number }
+  opts: { minutes: number; dayStart: string; dayEnd: string; weekdays: number[]; maxSlots: number },
+  timeZone?: string
 ) {
   const accounts = accountsFor(accountSel);
-  const tz = await timeZoneOf(accounts[0]);
+  const tz = await zoneFor(accounts[0], timeZone);
   const range = { start: toInstant(from, tz).getTime(), end: toInstant(to, tz).getTime() };
   if (range.end <= range.start) throw new Error('"to" must be after "from".');
   if (range.end - range.start > 62 * 86400000) throw new Error('Ask for at most about two months at a time.');
@@ -302,10 +318,11 @@ export async function findFreeTime(
 
 export async function createEvent(
   accountSel: string | undefined,
-  e: { summary: string; start: string; end?: string; minutes?: number; description?: string; location?: string; allDay?: boolean }
+  e: { summary: string; start: string; end?: string; minutes?: number; description?: string; location?: string; allDay?: boolean },
+  timeZone?: string
 ) {
   const [acc] = accountsFor(accountSel);
-  const tz = await timeZoneOf(acc);
+  const tz = await zoneFor(acc, timeZone);
   let start: calendar_v3.Schema$EventDateTime;
   let end: calendar_v3.Schema$EventDateTime;
   if (e.allDay) {

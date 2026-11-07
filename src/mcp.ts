@@ -302,6 +302,10 @@ export function buildServer(): McpServer {
       .string()
       .optional()
       .describe('Account (email, alias, local part) or "all" for every calendar-enabled account. Optional with one.');
+    const tzArg = z
+      .string()
+      .optional()
+      .describe("IANA time zone for reading and writing times, e.g. Asia/Jerusalem. Default: MULTI_MAIL_TZ, else the calendar's own setting.");
     const when = (what: string) => z.string().describe(`${what}: 2026-11-09, 2026-11-09T14:30 (calendar's time zone) or full RFC 3339.`);
 
     server.registerTool(
@@ -316,11 +320,12 @@ export function buildServer(): McpServer {
           to: when('End'),
           query: z.string().optional().describe('Free-text filter (title, description, location, attendees).'),
           max_results: z.number().int().min(1).max(250).default(50),
+          time_zone: tzArg,
         },
         annotations: READ,
       },
-      tool(async (a: { account?: string; from: string; to: string; query?: string; max_results: number }) =>
-        listEvents(a.account, a.from, a.to, a.query, a.max_results)
+      tool(async (a: { account?: string; from: string; to: string; query?: string; max_results: number; time_zone?: string }) =>
+        listEvents(a.account, a.from, a.to, a.query, a.max_results, a.time_zone)
       )
     );
 
@@ -342,6 +347,7 @@ export function buildServer(): McpServer {
             .default([0, 1, 2, 3, 4, 5, 6])
             .describe('Allowed days, 0 = Sunday … 6 = Saturday. E.g. [0,1,2,3,4] for Sunday–Thursday.'),
           max_slots: z.number().int().min(1).max(50).default(10),
+          time_zone: tzArg,
         },
         annotations: READ,
       },
@@ -355,6 +361,7 @@ export function buildServer(): McpServer {
           day_end: string;
           weekdays: number[];
           max_slots: number;
+          time_zone?: string;
         }) =>
           findFreeTime(a.account, a.from, a.to, {
             minutes: a.minutes,
@@ -362,7 +369,7 @@ export function buildServer(): McpServer {
             dayEnd: a.day_end,
             weekdays: a.weekdays,
             maxSlots: a.max_slots,
-          })
+          }, a.time_zone)
       )
     );
 
@@ -381,6 +388,7 @@ export function buildServer(): McpServer {
           all_day: z.boolean().default(false),
           description: z.string().optional(),
           location: z.string().optional(),
+          time_zone: tzArg,
         },
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
       },
@@ -394,6 +402,7 @@ export function buildServer(): McpServer {
           all_day: boolean;
           description?: string;
           location?: string;
+          time_zone?: string;
         }) =>
           createEvent(a.account, {
             summary: a.summary,
@@ -403,7 +412,7 @@ export function buildServer(): McpServer {
             allDay: a.all_day,
             description: a.description,
             location: a.location,
-          })
+          }, a.time_zone)
       )
     );
   }

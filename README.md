@@ -40,7 +40,7 @@ Each user brings **their own Google OAuth client**. Because of that, no Google a
 - `reply_all` adds every original recipient.
 
 **Permissions:** `gmail.readonly` and `gmail.compose` by default. The server **cannot delete** mail, move it to trash, or change settings.
-- **Calendar is opt-in per account** (`add --calendar`), which adds `calendar.readonly` and `calendar.events`. The server reads events and free/busy, and creates events on your own calendar without inviting anyone. It has no tool to change or delete an event. The calendar tools appear only when at least one account has calendar enabled.
+- **Calendar is opt-in per account** (`add --calendar`), which adds `calendar.readonly` and `calendar.events`. The server reads events and free/busy, and creates events on your own calendar without inviting anyone. It has no tool to change or delete an event. The calendar tools appear only when at least one account has calendar enabled. Times are read in each calendar's own time zone. If a calendar is set wrong (a new Google account often defaults to UTC), set `MULTI_MAIL_TZ=Asia/Jerusalem` or pass `time_zone` to the tool.
 - **Labels are opt-in per account** (`add --labels`), which adds `gmail.modify`. At Google's level that scope would also allow trashing mail, so the server has no trash tool and refuses the `TRASH` and `SPAM` labels.
 
 ## Drafts-only mode

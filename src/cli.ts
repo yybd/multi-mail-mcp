@@ -186,7 +186,17 @@ try {
       if (li >= 0) rest.splice(li, 1);
       const ci = rest.indexOf('--calendar');
       if (ci >= 0) rest.splice(ci, 1);
-      await add(rest[0], alias, li >= 0, ci >= 0);
+      // "add work --calendar": an existing alias or local part means that account's address.
+      let hint: string | undefined = rest[0];
+      if (hint && !hint.includes('@')) {
+        try {
+          hint = resolveAccount(hint).email;
+        } catch {
+          /* not a known account: let Google show its picker */
+          hint = undefined;
+        }
+      }
+      await add(hint, alias, li >= 0, ci >= 0);
       break;
     }
     case 'list':
