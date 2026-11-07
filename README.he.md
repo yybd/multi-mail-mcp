@@ -75,7 +75,7 @@ claude mcp add multi-mail -s user -- npx -y @yybd/multi-mail-mcp --drafts-only
   - בלי הרשאת מחיקה.
   - הטוקנים נשמרים מקומית בהרשאות `600`.
   - שרת ה-HTTP לא עולה בלי טוקן.
-- **אם צריך גם Drive, Calendar או Docs**, `google_workspace_mcp` הוא החלופה הבוגרת.
+- multi-mail מכסה מייל ויומן Google. **לשאר Workspace, כמו Drive או Docs**, `google_workspace_mcp` הוא החלופה הבוגרת, ו-`gws-connector` אם צריך כמה חשבונות.
 
 ## התקנה
 

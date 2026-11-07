@@ -84,7 +84,7 @@ Checked on 2026-11-07, with star counts from that day, against web search and th
   - It has no delete permission.
   - Tokens stay on your machine with `600` permissions.
   - The HTTP server won't start without a token.
-- If you also need Drive, Calendar or Docs, **google_workspace_mcp** is the mature choice.
+- multi-mail covers mail and Google Calendar. For the rest of Workspace, such as Drive or Docs, **google_workspace_mcp** is the mature choice, or **gws-connector** across several accounts.
 
 ## Setup
 
