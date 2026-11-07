@@ -65,7 +65,7 @@ const gmailUrl = (account: string, id: string) =>
 export function buildServer(): McpServer {
   const canSend = sendingEnabled();
   const server = new McpServer(
-    { name: 'multi-mail', version: '0.2.0' },
+    { name: 'multi-mail', version: '0.2.1' },
     { instructions: BASE_INSTRUCTIONS + (canSend ? SEND_INSTRUCTIONS : DRAFTS_ONLY_INSTRUCTIONS) }
   );
 
@@ -76,7 +76,8 @@ export function buildServer(): McpServer {
     'list_accounts',
     {
       title: 'List mail accounts',
-      description: 'The Gmail accounts connected to this server, with their aliases.',
+      description:
+        'List the Gmail accounts this server can use. Call it first when the user has not said which mailbox, or to learn the aliases to pass as "account" to every other tool. Returns each account\'s email, alias, and whether labels and calendar are enabled for it, the default account if one is set, and whether sending is enabled or the server is in drafts-only mode. Takes no input and changes nothing.',
       inputSchema: {},
       annotations: READ,
     },
@@ -96,7 +97,7 @@ export function buildServer(): McpServer {
       inputSchema: {
         account: z.string().optional().describe('Email, alias, or "all" to search every connected mailbox.'),
         query: z.string().default('').describe('Gmail query, e.g. "from:bank is:unread newer_than:30d".'),
-        max_results: z.number().int().min(1).max(100).default(20),
+        max_results: z.number().int().min(1).max(100).default(20).describe('How many messages to return (1–100). With account="all", the newest across all mailboxes.'),
         page_token: z.string().optional().describe('nextPageToken from a previous call (single account only).'),
       },
       annotations: READ,
@@ -110,11 +111,18 @@ export function buildServer(): McpServer {
     'read_email',
     {
       title: 'Read a message',
-      description: 'Full message: headers, plain-text body (HTML converted to text) and attachment names.',
+      description:
+        'Read one message in full: from, to, cc, reply-to, date, subject, labels, the body as plain text (HTML is converted to text), and the list of attachments with part_id, name, type and size. Use it after search_emails when you need what a single message says; use read_thread instead for the whole conversation. The body is cut at max_chars and marked "[truncated]" with truncated=true; attachment contents are not included (fetch one with get_attachment). An unknown message_id returns an error saying the message was not found. Read-only; does not mark the message as read.',
       inputSchema: {
         account: accountArg,
-        message_id: z.string().describe('Message id from search_emails.'),
-        max_chars: z.number().int().min(500).max(200000).default(20000),
+        message_id: z.string().describe('The message id ("id") returned by search_emails or list_drafts.'),
+        max_chars: z
+          .number()
+          .int()
+          .min(500)
+          .max(200000)
+          .default(20000)
+          .describe('Longest body to return, in characters (default 20,000). Raise it for long newsletters or legal text.'),
       },
       annotations: READ,
     },
@@ -127,11 +135,18 @@ export function buildServer(): McpServer {
     'read_thread',
     {
       title: 'Read a conversation',
-      description: 'Every message in a thread, oldest first.',
+      description:
+        'Read a whole conversation: every message in the thread, oldest first, each with the same fields as read_email (headers, plain-text body, attachment list). Use it when the reply history matters, such as before answering or summarising a back-and-forth; use read_email for a single message. max_chars is shared across the thread: each message gets an equal part of it (at least 2,000 characters), and longer bodies are cut and marked "[truncated]". An unknown thread_id returns an error. Read-only.',
       inputSchema: {
         account: accountArg,
-        thread_id: z.string().describe('threadId from search_emails or read_email.'),
-        max_chars: z.number().int().min(2000).max(400000).default(40000).describe('Total budget across the thread.'),
+        thread_id: z.string().describe('The "threadId" returned by search_emails or read_email.'),
+        max_chars: z
+          .number()
+          .int()
+          .min(2000)
+          .max(400000)
+          .default(40000)
+          .describe('Total characters for all bodies together (default 40,000), split evenly between the messages.'),
       },
       annotations: READ,
     },
@@ -144,7 +159,8 @@ export function buildServer(): McpServer {
     'list_labels',
     {
       title: 'List labels',
-      description: 'Labels/folders of a mailbox, for use with label: in search queries.',
+      description:
+        'List every label of one mailbox: system labels such as INBOX, UNREAD, STARRED, SENT, and the user\'s own labels (Gmail\'s folders), each with its id, name and type, sorted by name. Use it to find the exact name for a "label:" search in search_emails, or the name or id to pass to modify_labels. Works on every account, with or without --labels. Read-only.',
       inputSchema: { account: accountArg },
       annotations: READ,
     },
@@ -154,8 +170,8 @@ export function buildServer(): McpServer {
   const composeSchema = {
     account: accountArg.describe('Mailbox to write from (email, alias or local part).'),
     to: addrArg.describe('Recipients: "a@x.com, Name <b@y.com>" or a list. Optional when replying.'),
-    cc: addrArg,
-    bcc: addrArg,
+    cc: addrArg.describe('Cc recipients, same format as "to".'),
+    bcc: addrArg.describe('Bcc recipients, same format as "to". They are not shown to the other recipients.'),
     subject: z.string().optional().describe('Optional when replying ("Re: …" is added).'),
     body: z.string().describe('Plain-text body.'),
     html: z.string().optional().describe('Optional HTML version of the body.'),
@@ -214,8 +230,12 @@ export function buildServer(): McpServer {
     'list_drafts',
     {
       title: 'List drafts',
-      description: 'Drafts waiting in a mailbox.',
-      inputSchema: { account: accountArg, max_results: z.number().int().min(1).max(100).default(20) },
+      description:
+        'List the drafts saved in one mailbox: for each, the draftId (needed by send_draft), the message id, thread id, date, recipients, subject and a short snippet. Use it to check what is waiting to be sent, or to find a draft made earlier with create_draft. To read a draft\'s full text, pass its message id to read_email. Read-only.',
+      inputSchema: {
+        account: accountArg,
+        max_results: z.number().int().min(1).max(100).default(20).describe('How many drafts to return (1–100).'),
+      },
       annotations: READ,
     },
     tool(async (a: { account?: string; max_results: number }) => listDrafts(a.account, a.max_results))
@@ -239,14 +259,14 @@ export function buildServer(): McpServer {
     {
       title: 'Get an attachment',
       description:
-        'Download one attachment of a message. Text files and PDFs come back as text, images as an image. Other files (and scanned PDFs) are saved under ~/.multi-mail/attachments and the path is returned. Pick it by part_id from read_email, or by filename; a message with one attachment needs neither.',
+        'Download one attachment of a message and return its contents. Text files and PDFs with a text layer come back as text, PNG/JPEG/GIF/WebP images (up to 5 MB) as an image you can see; any other file, and a scanned PDF, is saved under ~/.multi-mail/attachments and its path is returned with a note. Use it after read_email when the user needs what an attached invoice, report or photo says. Pick the file by part_id from read_email\'s attachment list, or by filename; a message with a single attachment needs neither. Returns an error listing the attachments if none matches. Does not change the mailbox.',
       inputSchema: {
         account: accountArg,
         message_id: z.string().describe('Message id from search_emails or read_email.'),
         part_id: z.string().optional().describe('partId from the attachments list of read_email.'),
         filename: z.string().optional().describe('Attachment file name, when part_id is not known.'),
         save: z.boolean().default(false).describe('Also save the file under ~/.multi-mail/attachments.'),
-        max_chars: z.number().int().min(500).max(400000).default(50000),
+        max_chars: z.number().int().min(500).max(400000).default(50000).describe('Longest text to return for text and PDF files (default 50,000); longer text is cut and marked.'),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -271,7 +291,7 @@ export function buildServer(): McpServer {
     {
       title: 'Change labels',
       description:
-        'Add or remove labels on messages or a whole thread. Mark read: remove UNREAD. Mark unread: add UNREAD. Archive: remove INBOX. Star: add STARRED. Labels can be names (any case) or ids from list_labels. Needs an account connected with --labels. TRASH and SPAM are refused.',
+        'Add or remove labels on specific messages, or on every message of a thread. This is how to mark read (remove UNREAD), mark unread (add UNREAD), archive (remove INBOX), star (add STARRED), or file mail under a label. Labels are names in any case, or ids from list_labels; unknown names return an error, and create_label makes new ones. Returns the account and the label ids that were added and removed. Only for accounts connected with --labels (otherwise the error says how to enable it). TRASH and SPAM are refused, so nothing can be deleted or marked as spam.',
       inputSchema: {
         account: accountArg,
         message_ids: z.array(z.string()).optional().describe('Message ids to change.'),
@@ -290,8 +310,9 @@ export function buildServer(): McpServer {
     'create_label',
     {
       title: 'Create a label',
-      description: 'Create a new label in a mailbox (use "/" for nesting, e.g. "Projects/Acme"). Needs an account connected with --labels.',
-      inputSchema: { account: accountArg, name: z.string().describe('Label name.') },
+      description:
+        'Create a new user label in one mailbox and return its id and name, ready for modify_labels. Use it when the user wants mail filed under a label that list_labels does not show yet. A "/" makes a nested label, e.g. "Projects/Acme". Fails if a label with that name already exists. Only for accounts connected with --labels.',
+      inputSchema: { account: accountArg, name: z.string().describe('The new label\'s name; "/" nests it under a parent.') },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
     tool(async (a: { account?: string; name: string }) => createLabel(a.account, a.name))
@@ -313,13 +334,13 @@ export function buildServer(): McpServer {
       {
         title: 'List calendar events',
         description:
-          'Events between two times, across every calendar shown in Google Calendar (primary and the ones ticked in the sidebar), optionally for every enabled account at once. Sorted by start.',
+          'List calendar events between two times, earliest first, across every calendar the user sees in Google Calendar (the primary one and those ticked in the sidebar), for one account or for every calendar-enabled account with account="all". Each event has its title, start and end with the time-zone offset (or dates for all-day events), calendar, account, location, organizer, attendee count, the user\'s own response and a link. Use it to answer "what do I have on…" questions; use find_free_time to look for openings. Only for accounts connected with --calendar. Read-only.',
         inputSchema: {
           account: calAccount,
           from: when('Start'),
           to: when('End'),
           query: z.string().optional().describe('Free-text filter (title, description, location, attendees).'),
-          max_results: z.number().int().min(1).max(250).default(50),
+          max_results: z.number().int().min(1).max(250).default(50).describe('How many events to return (1–250), earliest first.'),
           time_zone: tzArg,
         },
         annotations: READ,
@@ -334,19 +355,19 @@ export function buildServer(): McpServer {
       {
         title: 'Find free time',
         description:
-          'Free slots of at least the given length, inside working hours, checked against the busy times of every calendar (of every enabled account with account="all"). Use it before proposing meeting times.',
+          'Find open slots of at least the given length inside working hours on the chosen weekdays, checked against the busy times of every calendar the user sees (of every calendar-enabled account with account="all"). Returns the slots with start, end and length, the time zone used, and which calendars were checked. Use it before proposing meeting times, for example when an email asks to meet; use list_events to see what the busy times are. Searches at most about two months at once. Only for accounts connected with --calendar. Read-only.',
         inputSchema: {
           account: calAccount,
           from: when('Search from'),
           to: when('Search until'),
           minutes: z.number().int().min(5).max(600).default(60).describe('Length of the meeting.'),
-          day_start: z.string().regex(/^\d{2}:\d{2}$/).default('09:00'),
-          day_end: z.string().regex(/^\d{2}:\d{2}$/).default('18:00'),
+          day_start: z.string().regex(/^\d{2}:\d{2}$/).default('09:00').describe('Start of the working day, HH:MM (default 09:00).'),
+          day_end: z.string().regex(/^\d{2}:\d{2}$/).default('18:00').describe('End of the working day, HH:MM (default 18:00).'),
           weekdays: z
             .array(z.number().int().min(0).max(6))
             .default([0, 1, 2, 3, 4, 5, 6])
             .describe('Allowed days, 0 = Sunday … 6 = Saturday. E.g. [0,1,2,3,4] for Sunday–Thursday.'),
-          max_slots: z.number().int().min(1).max(50).default(10),
+          max_slots: z.number().int().min(1).max(50).default(10).describe('How many free slots to return at most (1–50), earliest first.'),
           time_zone: tzArg,
         },
         annotations: READ,
@@ -378,16 +399,16 @@ export function buildServer(): McpServer {
       {
         title: 'Create a calendar event',
         description:
-          'Create an event on the account\'s own primary calendar. Nobody is invited and no email goes out. Give end, or minutes (default 60), or all_day.',
+          'Create an event on the account\'s own primary calendar and return its id, times and link. Nobody is invited and no email goes out, so it is safe for holding a slot or adding a reminder; to meet with others, draft them an email instead. Give "end", or "minutes" (default 60), or all_day. Times without an offset are read in the calendar\'s time zone. There is no tool to change or delete events. Only for accounts connected with --calendar.',
         inputSchema: {
           account: accountArg,
           summary: z.string().describe('Title.'),
           start: when('Start'),
           end: z.string().optional().describe('End, same formats as start.'),
-          minutes: z.number().int().min(5).max(1440).optional(),
-          all_day: z.boolean().default(false),
-          description: z.string().optional(),
-          location: z.string().optional(),
+          minutes: z.number().int().min(5).max(1440).optional().describe('Length in minutes when "end" is not given (default 60).'),
+          all_day: z.boolean().default(false).describe('An all-day event on the date of "start" (through the date of "end", if given).'),
+          description: z.string().optional().describe('Notes shown in the event.'),
+          location: z.string().optional().describe('Place or meeting link.'),
           time_zone: tzArg,
         },
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -449,7 +470,7 @@ export function buildServer(): McpServer {
     {
       title: 'Fetch a message',
       description: 'Full text of a message returned by the search tool (id is "account:messageId").',
-      inputSchema: { id: z.string() },
+      inputSchema: { id: z.string().describe('A result id from the search tool, in the form "account:messageId".') },
       annotations: READ,
     },
     async ({ id }: { id: string }) => {
