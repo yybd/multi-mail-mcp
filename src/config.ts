@@ -20,6 +20,13 @@ export const ACCOUNTS_DIR = join(HOME, 'accounts');
 // labels (mark read, archive, star…). At Google's level gmail.modify would also allow
 // trashing; this server has no tool for that and refuses the TRASH and SPAM labels.
 export const LABEL_SCOPE = 'https://www.googleapis.com/auth/gmail.modify';
+// Calendar is opt-in per account too (`add --calendar`): read events and free/busy on every
+// calendar, and create events on your own calendar. The server never invites anyone and has
+// no tool to change or delete an event.
+export const CALENDAR_SCOPES = [
+  'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/calendar.events',
+];
 export const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.compose',
@@ -131,4 +138,9 @@ export function resolveAccount(selector?: string): Account {
 
 export function hasLabelScope(acc: Account): boolean {
   return (acc.tokens.scope ?? '').split(' ').includes(LABEL_SCOPE);
+}
+
+export function hasCalendarScope(acc: Account): boolean {
+  const granted = (acc.tokens.scope ?? '').split(' ');
+  return CALENDAR_SCOPES.every((s) => granted.includes(s));
 }

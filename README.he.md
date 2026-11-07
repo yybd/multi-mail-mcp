@@ -22,12 +22,16 @@
 | `get_attachment` | מוריד קובץ מצורף אחד: טקסט ו-PDF חוזרים כטקסט, ותמונות כתמונה. כל השאר, וגם PDF סרוק, נשמרים ב-`~/.multi-mail/attachments` |
 | `modify_labels` | מוסיף או מסיר תוויות להודעות או לשרשור: סימון כנקרא או כלא נקרא, ארכוב, כוכב, שיוך לתווית. רק בחשבונות שחוברו עם `--labels` |
 | `create_label` | יוצר תווית (`Projects/Acme` יוצר קינון). רק בחשבונות שחוברו עם `--labels` |
+| `list_events` | אירועי יומן בין שני זמנים, בכל היומנים שמוצגים ב-Google Calendar, לחשבון אחד או לכולם. רק בחשבונות שחוברו עם `--calendar` |
+| `find_free_time` | חלונות פנויים באורך מבוקש בשעות העבודה, בבדיקה מול כל היומנים של כל החשבונות שהיומן מופעל בהם |
+| `create_event` | יוצר אירוע ביומן שלך בלבד. אף אחד לא מוזמן ולא נשלח שום מייל |
 | `search` / `fetch` | הצורה ש-ChatGPT מצפה לה (connectors, deep research) — מחפש בכל התיבות |
 
 בכל כלי הפרמטר `account` מקבל כתובת מלאה, כינוי (`work`), או את החלק שלפני ה-@. כשיש רק חשבון אחד אפשר להשמיט אותו; `MULTI_MAIL_DEFAULT` קובע ברירת מחדל.
 תשובה (`reply_to_message_id`) נכנסת לשרשור הנכון וממלאת לבד נמען ונושא; `reply_all` מוסיף את כל הנמענים המקוריים.
 
 **הרשאות:** כברירת מחדל `gmail.readonly` + `gmail.compose`. השרת **לא יכול למחוק** מייל, להעביר לאשפה או לשנות הגדרות.
+- **היומן מופעל לפי בחירה, לכל חשבון בנפרד** (`add --calendar`). זה מוסיף את ההרשאות `calendar.readonly` ו-`calendar.events`. השרת קורא אירועים וזמינות, ויוצר אירועים ביומן שלך בלי להזמין אף אחד. אין בו כלי לשינוי או מחיקה של אירוע. כלי היומן מופיעים רק כשלפחות חשבון אחד מחובר עם יומן.
 - **תוויות מופעלות לפי בחירה, לכל חשבון בנפרד** (`add --labels`). זה מוסיף את ההרשאה `gmail.modify`, שברמת גוגל מאפשרת גם העברה לאשפה. לכן אין בשרת כלי להעברה לאשפה, והוא מסרב להוסיף את התוויות `TRASH` ו-`SPAM`.
 
 ## מצב "טיוטות בלבד"
@@ -94,7 +98,7 @@ git clone https://github.com/yybd/multi-mail-mcp.git multi-mail && cd multi-mail
 את השלבים האלה עושים פעם אחת, מחשבון גוגל אחד. אותו client משמש אחר כך לכל התיבות.
 
 1. **פרויקט:** להיכנס ל-[console.cloud.google.com/projectcreate](https://console.cloud.google.com/projectcreate), לתת שם (למשל `multi-mail`) וללחוץ **Create**. לוודא שהפרויקט נבחר בתפריט העליון.
-2. **Gmail API:** בדף ה-[Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com) ללחוץ **Enable**.
+2. **Gmail API:** בדף ה-[Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com) ללחוץ **Enable**. אם תשתמש ביומן, מפעילים גם את [Google Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com).
 3. **מסך ההסכמה:** ב-[Google Auth Platform](https://console.cloud.google.com/auth/overview) ללחוץ **Get started**, ואז:
    - App name: `multi-mail`.
    - User support email: הכתובת שלך.
@@ -128,6 +132,8 @@ npx -y @yybd/multi-mail-mcp add --alias home
 - במסך ההרשאות מסמנים את **כל** התיבות. אם אחת חסרה, ה-CLI יעצור ויגיד איזו.
 
 ניהול: `npx -y @yybd/multi-mail-mcp list` · `check` (בודק שכל החשבונות עדיין מורשים) · `alias <account> <name>` · `remove <account>`.
+
+יומן: `add <account> --calendar` מחבר את החשבון מחדש עם Google Calendar. לשם כך צריך להפעיל את **Google Calendar API** באותו פרויקט שבו מופעל Gmail API (שלב 2 בהגדרת ה-OAuth). אפשר לשלב דגלים, למשל `add work --labels --calendar`.
 
 תוויות: `add <account> --labels` מחבר את החשבון מחדש עם הרשאה לתוויות. היא נדרשת ל-`modify_labels` ול-`create_label`. הרצת `add` שוב בלי `--labels` מבטלת את ההרשאה.
 

@@ -25,6 +25,9 @@ Each user brings **their own Google OAuth client**. Because of that, no Google a
 | `get_attachment` | Downloads one attachment: text and PDFs come back as text, images as an image, anything else (and scanned PDFs) is saved under `~/.multi-mail/attachments` |
 | `modify_labels` | Adds or removes labels on messages or a thread: mark read or unread, archive, star, file under a label. Accounts connected with `--labels` only |
 | `create_label` | Creates a label (`Projects/Acme` nests). Accounts connected with `--labels` only |
+| `list_events` | Calendar events between two times, across every calendar you see in Google Calendar, for one account or all of them. Accounts connected with `--calendar` only |
+| `find_free_time` | Free slots of a given length inside working hours, checked against every calendar of every calendar-enabled account |
+| `create_event` | Creates an event on your own calendar. Nobody is invited and no email goes out |
 | `search` / `fetch` | Searches every mailbox and fetches one message, in the shape ChatGPT expects (connectors, deep research) |
 
 **Choosing a mailbox:**
@@ -37,6 +40,7 @@ Each user brings **their own Google OAuth client**. Because of that, no Google a
 - `reply_all` adds every original recipient.
 
 **Permissions:** `gmail.readonly` and `gmail.compose` by default. The server **cannot delete** mail, move it to trash, or change settings.
+- **Calendar is opt-in per account** (`add --calendar`), which adds `calendar.readonly` and `calendar.events`. The server reads events and free/busy, and creates events on your own calendar without inviting anyone. It has no tool to change or delete an event. The calendar tools appear only when at least one account has calendar enabled.
 - **Labels are opt-in per account** (`add --labels`), which adds `gmail.modify`. At Google's level that scope would also allow trashing mail, so the server has no trash tool and refuses the `TRASH` and `SPAM` labels.
 
 ## Drafts-only mode
@@ -101,7 +105,7 @@ Then use `node dist/main.js` wherever this guide says `npx -y @yybd/multi-mail-m
 Do this once, from one Google account. The same client then works for every mailbox you connect. If you already have a Google Cloud project for personal tools, you can add the client there instead of creating a new project.
 
 1. **Project.** Go to [console.cloud.google.com/projectcreate](https://console.cloud.google.com/projectcreate), name the project (for example `multi-mail`) and click **Create**. Make sure it's selected in the top bar.
-2. **Gmail API.** On the [Gmail API page](https://console.cloud.google.com/apis/library/gmail.googleapis.com), click **Enable**.
+2. **Gmail API.** On the [Gmail API page](https://console.cloud.google.com/apis/library/gmail.googleapis.com), click **Enable**. If you'll use the calendar, also enable the [Google Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com).
 3. **Consent screen.** In [Google Auth Platform](https://console.cloud.google.com/auth/overview), click **Get started** and fill in:
    - App name: anything you like.
    - Support email: yours.
@@ -140,6 +144,7 @@ Each `add` opens a browser where you pick a Google account and approve access.
 - `check` verifies every account still has access.
 - `alias <account> <name>` sets or changes an alias. The account can be its current alias, its address, or the part before `@`. For example, `npx -y @yybd/multi-mail-mcp alias tech work` renames `tech` to `work`, and it takes effect immediately, without a restart.
 - `remove <account>` disconnects an account.
+- `add <account> --calendar` reconnects an account with Google Calendar. This needs the **Google Calendar API** enabled in the same Cloud project as the Gmail API (step 2 of the OAuth setup). The flags combine, for example `add work --labels --calendar`.
 - `add <account> --labels` reconnects an account with label permission (needed for `modify_labels` and `create_label`). Running `add` again without `--labels` takes it away.
 
 Tokens live in `~/.multi-mail/accounts/` with `600` permissions; `MULTI_MAIL_HOME` moves that folder. A running server picks up a newly added account without a restart.

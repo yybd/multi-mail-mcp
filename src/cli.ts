@@ -15,9 +15,11 @@ import { gmail as gmailApi } from '@googleapis/gmail';
 import {
   ACCOUNTS_DIR,
   CREDENTIALS_PATH,
+  CALENDAR_SCOPES,
   LABEL_SCOPE,
   SCOPES,
   ensureHome,
+  hasCalendarScope,
   hasLabelScope,
   listAccounts,
   loadClientSecrets,
@@ -100,9 +102,10 @@ async function authorize(loginHint: string | undefined, scopes: string[]): Promi
   });
 }
 
-async function add(hint: string | undefined, alias: string | undefined, labels: boolean) {
+async function add(hint: string | undefined, alias: string | undefined, labels: boolean, calendar: boolean) {
   ensureHome();
-  const { tokens } = await authorize(hint, labels ? [...SCOPES, LABEL_SCOPE] : SCOPES);
+  const scopes = [...SCOPES, ...(labels ? [LABEL_SCOPE] : []), ...(calendar ? CALENDAR_SCOPES : [])];
+  const { tokens } = await authorize(hint, scopes);
   if (!tokens.refresh_token) {
     throw new Error(
       'Google did not return a refresh token. Remove the app at https://myaccount.google.com/permissions and run add again.'
@@ -120,7 +123,7 @@ async function add(hint: string | undefined, alias: string | undefined, labels: 
     added: prev?.added ?? new Date().toISOString(),
   };
   saveAccount(acc);
-  console.log(`${prev ? 'Reconnected' : 'Connected'} ${email}${acc.alias ? ` (alias: ${acc.alias})` : ''}${labels ? ', labels enabled' : ''} — ${profile.messagesTotal} messages.`);
+  console.log(`${prev ? 'Reconnected' : 'Connected'} ${email}${acc.alias ? ` (alias: ${acc.alias})` : ''}${labels ? ', labels enabled' : ''}${calendar ? ', calendar enabled' : ''} — ${profile.messagesTotal} messages.`);
 }
 
 async function check() {
@@ -129,7 +132,7 @@ async function check() {
   for (const a of accounts) {
     try {
       const p = await getProfile(a);
-      console.log(`✓ ${a.email}${a.alias ? ` (${a.alias})` : ''}${hasLabelScope(a) ? ' [labels]' : ''} — ${p.messagesTotal} messages`);
+      console.log(`✓ ${a.email}${a.alias ? ` (${a.alias})` : ''}${hasLabelScope(a) ? ' [labels]' : ''}${hasCalendarScope(a) ? ' [calendar]' : ''} — ${p.messagesTotal} messages`);
     } catch (e) {
       console.log(`✗ ${a.email} — ${(e as Error).message}`);
     }
@@ -139,7 +142,7 @@ async function check() {
 function list() {
   const accounts = listAccounts();
   if (!accounts.length) return console.log(`No accounts connected yet. Run: npx -y @yybd/multi-mail-mcp add\n(credentials: ${CREDENTIALS_PATH})`);
-  for (const a of accounts) console.log(`${a.email}${a.alias ? `  alias=${a.alias}` : ''}${hasLabelScope(a) ? '  labels' : ''}  added=${a.added.slice(0, 10)}`);
+  for (const a of accounts) console.log(`${a.email}${a.alias ? `  alias=${a.alias}` : ''}${hasLabelScope(a) ? '  labels' : ''}${hasCalendarScope(a) ? '  calendar' : ''}  added=${a.added.slice(0, 10)}`);
   console.log(`\n${accounts.length} account(s) in ${ACCOUNTS_DIR}`);
 }
 
@@ -152,9 +155,10 @@ Usage: npx -y @yybd/multi-mail-mcp [command]
   http                         run the Streamable HTTP server (needs MCP_AUTH_TOKEN)
   --drafts-only                with either of the above: no tool can send mail
 
-  add [email] [--alias name] [--labels]
-                               connect an account (browser sign-in); --labels also allows
-                               adding/removing labels (mark read, archive, star)
+  add [email] [--alias name] [--labels] [--calendar]
+                               connect an account (browser sign-in). --labels also allows
+                               adding/removing labels (mark read, archive, star);
+                               --calendar adds Google Calendar (read, free time, create)
   list                         list connected accounts
   check                        verify every account still has access
   alias <account> <name>       set or change an alias ("work", "home"…)
@@ -180,7 +184,9 @@ try {
       const alias = flag('alias');
       const li = rest.indexOf('--labels');
       if (li >= 0) rest.splice(li, 1);
-      await add(rest[0], alias, li >= 0);
+      const ci = rest.indexOf('--calendar');
+      if (ci >= 0) rest.splice(ci, 1);
+      await add(rest[0], alias, li >= 0, ci >= 0);
       break;
     }
     case 'list':

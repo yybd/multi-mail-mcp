@@ -2,7 +2,7 @@
   "name": "@yybd/multi-mail-mcp",
   "version": "0.2.0",
   "mcpName": "io.github.yybd/multi-mail-mcp",
-  "description": "MCP server for reading, searching and writing mail across several Gmail accounts (Claude Desktop, Claude Code, ChatGPT)",
+  "description": "MCP server for several Gmail accounts \u2014 search, read, draft, send, attachments, labels and Google Calendar \u2014 for Claude Desktop, Claude Code and ChatGPT",
   "license": "MIT",
   "author": "yybd",
   "repository": {
@@ -16,7 +16,9 @@
     "email",
     "claude",
     "chatgpt",
-    "multi-account"
+    "multi-account",
+    "calendar",
+    "google-calendar"
   ],
   "type": "module",
   "bin": {
@@ -36,6 +38,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@googleapis/calendar": "20.1.0",
     "@googleapis/gmail": "^22.0.2",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "express": "^5.3.0",

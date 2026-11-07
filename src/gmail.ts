@@ -11,38 +11,54 @@ export function oauthClient(redirectUri?: string) {
   return new auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
-const clients = new Map<string, { refresh: string; api: gmail_v1.Gmail }>();
+type OAuth = ReturnType<typeof oauthClient>;
+const auths = new Map<string, { refresh: string; auth: OAuth }>();
+const gmails = new WeakMap<OAuth, gmail_v1.Gmail>();
 
-export function apiFor(acc: Account): gmail_v1.Gmail {
+/** One authorized OAuth client per account, shared by Gmail and Calendar. */
+export function authFor(acc: Account): OAuth {
   const refresh = acc.tokens.refresh_token ?? '';
-  const cached = clients.get(acc.email);
-  if (cached && cached.refresh === refresh) return cached.api;
+  const cached = auths.get(acc.email);
+  if (cached && cached.refresh === refresh) return cached.auth;
   if (!refresh) throw new Error(`${acc.email} has no refresh token — reconnect it: npx -y @yybd/multi-mail-mcp add`);
   const client = oauthClient();
   client.setCredentials(acc.tokens);
   client.on('tokens', (t) => updateTokens(acc.email, t));
-  const api = gmailApi({ version: 'v1', auth: client });
-  clients.set(acc.email, { refresh, api });
+  auths.set(acc.email, { refresh, auth: client });
+  return client;
+}
+
+export function apiFor(acc: Account): gmail_v1.Gmail {
+  const auth = authFor(acc);
+  let api = gmails.get(auth);
+  if (!api) {
+    api = gmailApi({ version: 'v1', auth });
+    gmails.set(auth, api);
+  }
   return api;
 }
 
 /** Turns Google's terse auth failures into something the user can act on. */
+export function friendlyError(acc: Account, err: any): Error {
+  const msg = String(err?.response?.data?.error_description ?? err?.response?.data?.error?.message ?? err?.message ?? err);
+  if (/invalid_grant|unauthorized_client|Token has been expired or revoked/i.test(msg)) {
+    return new Error(
+      `Access to ${acc.email} has expired or was revoked. Reconnect: npx -y @yybd/multi-mail-mcp add ${acc.email}. ` +
+        '(If this happens every 7 days, the OAuth app is still in "Testing" — publish it, see README.)'
+    );
+  }
+  return new Error(`${acc.email}: ${msg}`);
+}
+
 async function call<T>(acc: Account, fn: (api: gmail_v1.Gmail) => Promise<T>): Promise<T> {
   try {
     return await fn(apiFor(acc));
   } catch (err: any) {
-    const msg = String(err?.response?.data?.error_description ?? err?.response?.data?.error?.message ?? err?.message ?? err);
-    if (/invalid_grant|unauthorized_client|Token has been expired or revoked/i.test(msg)) {
-      throw new Error(
-        `Access to ${acc.email} has expired or was revoked. Reconnect: npx -y @yybd/multi-mail-mcp add ${acc.email}. ` +
-          '(If this happens every 7 days, the OAuth app is still in "Testing" — publish it, see README.)'
-      );
-    }
-    throw new Error(`${acc.email}: ${msg}`);
+    throw friendlyError(acc, err);
   }
 }
 
-async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
+export async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
   let i = 0;
   const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {

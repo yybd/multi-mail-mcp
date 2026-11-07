@@ -15,11 +15,12 @@ process.env.MULTI_MAIL_HOME = home;
 mkdirSync(join(home, 'accounts'), { recursive: true });
 writeFileSync(join(home, 'credentials.json'), JSON.stringify({ installed: { client_id: 'x', client_secret: 'y' } }));
 for (const [email, alias] of [['me.work@gmail.com', 'work'], ['me.home@gmail.com', 'home']]) {
-  writeFileSync(join(home, 'accounts', `${email}.json`), JSON.stringify({ email, alias, tokens: { refresh_token: 'r', ...(alias === 'home' ? { scope: 'https://www.googleapis.com/auth/gmail.modify' } : {}) }, added: '2026-11-07' }));
+  writeFileSync(join(home, 'accounts', `${email}.json`), JSON.stringify({ email, alias, tokens: { refresh_token: 'r', ...(alias === 'home' ? { scope: 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events' } : {}) }, added: '2026-11-07' }));
 }
 
 const { buildRaw, encodeAddress, addressList, extractBody, htmlToText, safeFilename } = await import('../src/mime.js');
 const { resolveLabelIds } = await import('../src/gmail.js');
+const { toInstant, formatInTz, mergeBusy, freeSlots } = await import('../src/calendar.js');
 const { resolveAccount } = await import('../src/config.js');
 
 // --- MIME ---
@@ -54,6 +55,27 @@ const labels = [{ id: 'UNREAD', name: 'UNREAD' }, { id: 'INBOX', name: 'INBOX' }
 assert.deepEqual(resolveLabelIds(labels, ['projects/acme', 'unread', 'Label_7', 'nope']), { ids: ['Label_7', 'UNREAD', 'Label_7'], unknown: ['nope'] });
 console.log('✓ label names');
 
+// --- calendar time math (pure) ---
+const TZ = 'Asia/Jerusalem';
+assert.equal(toInstant('2026-11-09T14:30', TZ).toISOString(), '2026-11-09T12:30:00.000Z'); // winter, +02:00
+assert.equal(toInstant('2026-07-01T09:00', TZ).toISOString(), '2026-07-01T06:00:00.000Z'); // summer, +03:00
+assert.equal(toInstant('2026-11-09T14:30:00Z', TZ).toISOString(), '2026-11-09T14:30:00.000Z');
+assert.equal(formatInTz(new Date('2026-11-09T12:30:00Z'), TZ), '2026-11-09T14:30:00+02:00');
+assert.throws(() => toInstant('tomorrow', TZ), /Not a valid time/);
+const H = (t: string) => toInstant(t, TZ).getTime();
+assert.deepEqual(mergeBusy([{ start: 5, end: 10 }, { start: 1, end: 6 }, { start: 20, end: 30 }]), [{ start: 1, end: 10 }, { start: 20, end: 30 }]);
+const slots = freeSlots(
+  [{ start: H('2026-11-09T10:00'), end: H('2026-11-09T11:00') }, { start: H('2026-11-09T10:30'), end: H('2026-11-09T12:00') }],
+  { start: H('2026-11-09T00:00'), end: H('2026-11-11T00:00') },
+  TZ,
+  { minutes: 60, dayStart: '09:00', dayEnd: '18:00', weekdays: [0, 1, 2, 3, 4], maxSlots: 10 }
+).map((x) => [formatInTz(new Date(x.start), TZ).slice(5, 16), formatInTz(new Date(x.end), TZ).slice(11, 16)]);
+// Monday 9th: 09-10 free, busy 10-12 (merged), 12-18 free; Tuesday 10th: whole day.
+assert.deepEqual(slots, [['11-09T09:00', '10:00'], ['11-09T12:00', '18:00'], ['11-10T09:00', '18:00']]);
+const fri = freeSlots([], { start: H('2026-11-13T00:00'), end: H('2026-11-15T00:00') }, TZ, { minutes: 30, dayStart: '09:00', dayEnd: '18:00', weekdays: [0, 1, 2, 3, 4], maxSlots: 5 });
+assert.equal(fri.length, 0); // Friday and Saturday are excluded
+console.log('✓ calendar time math');
+
 // --- accounts ---
 assert.equal(resolveAccount('work').email, 'me.work@gmail.com');
 assert.equal(resolveAccount('me.home').email, 'me.home@gmail.com');
@@ -63,7 +85,7 @@ assert.throws(() => resolveAccount('nobody'), /Unknown account/);
 console.log('✓ account selection');
 
 // --- MCP over stdio ---
-const EXPECTED = ['create_draft', 'create_label', 'fetch', 'get_attachment', 'list_accounts', 'list_drafts', 'list_labels', 'modify_labels', 'read_email', 'read_thread', 'search', 'search_emails', 'send_draft', 'send_email'];
+const EXPECTED = ['create_draft', 'create_event', 'create_label', 'fetch', 'find_free_time', 'get_attachment', 'list_accounts', 'list_drafts', 'list_events', 'list_labels', 'modify_labels', 'read_email', 'read_thread', 'search', 'search_emails', 'send_draft', 'send_email'];
 const DRAFTS_ONLY = EXPECTED.filter((t) => !t.startsWith('send_'));
 const env = { ...process.env, MULTI_MAIL_HOME: home } as Record<string, string>;
 const stdio = new Client({ name: 'test', version: '0' });
@@ -81,8 +103,11 @@ assert.match((lbl.content as any)[0].text, /Labels are not enabled .*--labels/);
 const trash = await stdio.callTool({ name: 'modify_labels', arguments: { account: 'home', message_ids: ['x'], add: ['trash'] } });
 assert.equal(trash.isError, true);
 assert.match((trash.content as any)[0].text, /Refusing to add trash/);
+const cal = await stdio.callTool({ name: 'list_events', arguments: { account: 'work', from: '2026-11-09', to: '2026-11-10' } });
+assert.equal(cal.isError, true);
+assert.match((cal.content as any)[0].text, /Calendar is not enabled .*--calendar/);
 await stdio.close();
-console.log('✓ stdio:', tools.length, 'tools; labels need --labels; TRASH refused');
+console.log('✓ stdio:', tools.length, 'tools; labels need --labels; TRASH refused; calendar needs --calendar');
 
 // --- drafts-only: the send tools are not there at all ---
 for (const how of [{ args: ['tsx', 'src/main.ts', '--drafts-only'], env }, { args: ['tsx', 'src/main.ts'], env: { ...env, MULTI_MAIL_SEND: 'off' } }]) {
