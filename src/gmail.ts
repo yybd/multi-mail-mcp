@@ -1,8 +1,10 @@
 // Gmail operations, one authorized client per connected account.
 
 import { gmail as gmailApi, auth, type gmail_v1 } from '@googleapis/gmail';
-import { listAccounts, loadClientSecrets, resolveAccount, updateTokens, type Account } from './config.js';
-import { addressList, buildRaw, extractBody, header, type Attachment } from './mime.js';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { HOME, hasLabelScope, listAccounts, loadClientSecrets, resolveAccount, updateTokens, type Account } from './config.js';
+import { addressList, attachmentParts, buildRaw, extractBody, header, safeFilename, type Attachment } from './mime.js';
 
 export function oauthClient(redirectUri?: string) {
   const { clientId, clientSecret } = loadClientSecrets();
@@ -308,4 +310,191 @@ export async function sendDraft(accountSel: string | undefined, draftId: string)
   const acc = resolveAccount(accountSel);
   const r = await call(acc, (api) => api.users.drafts.send({ userId: 'me', requestBody: { id: draftId } }));
   return { sent: true, account: acc.email, id: r.data.id, threadId: r.data.threadId };
+}
+
+// ---------- attachments ----------
+
+const TEXT_TYPES = /^(text\/|application\/(json|xml|csv|x-csv|javascript|x-yaml|yaml|rtf))/i;
+const IMAGE_TYPES = /^image\/(png|jpe?g|gif|webp)$/i;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+export interface FetchedAttachment {
+  account: string;
+  messageId: string;
+  partId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  /** text, or PDF text layer */
+  text?: string;
+  truncated?: boolean;
+  /** base64 image for clients that can see images */
+  image?: { data: string; mimeType: string };
+  /** where the file was written, when it was saved */
+  savedTo?: string;
+  note?: string;
+}
+
+function saveAttachment(account: string, messageId: string, filename: string, bytes: Buffer): string {
+  const dir = join(HOME, 'attachments', safeFilename(account), safeFilename(messageId));
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const path = join(dir, safeFilename(filename));
+  writeFileSync(path, bytes, { mode: 0o600 });
+  return path;
+}
+
+async function pdfText(bytes: Buffer): Promise<string> {
+  const { extractText, getDocumentProxy } = await import('unpdf');
+  const pdf = await getDocumentProxy(new Uint8Array(bytes));
+  const { text } = await extractText(pdf, { mergePages: true });
+  return (Array.isArray(text) ? text.join('\n\n') : text).trim();
+}
+
+/**
+ * Download one attachment. Text and PDF come back as text, images as an image,
+ * anything else is saved under ~/.multi-mail/attachments and its path returned.
+ */
+export async function getAttachment(
+  accountSel: string | undefined,
+  messageId: string,
+  which: { partId?: string; filename?: string },
+  opts: { save: boolean; maxChars: number }
+): Promise<FetchedAttachment> {
+  const acc = resolveAccount(accountSel);
+  return call(acc, async (api) => {
+    const msg = (await api.users.messages.get({ userId: 'me', id: messageId, format: 'full' })).data;
+    const parts = attachmentParts(msg.payload);
+    if (parts.length === 0) throw new Error('This message has no attachments.');
+    const list = parts.map((p) => `${p.partId}: ${p.filename}`).join(', ');
+    let part = which.partId ? parts.find((p) => p.partId === which.partId) : undefined;
+    if (!part && which.filename) {
+      const hits = parts.filter((p) => p.filename?.toLowerCase() === which.filename!.toLowerCase());
+      if (hits.length > 1) throw new Error(`Several attachments are named "${which.filename}" — pass part_id. Attachments: ${list}`);
+      part = hits[0];
+    }
+    if (!part && !which.partId && !which.filename && parts.length === 1) part = parts[0];
+    if (!part) throw new Error(`Attachment not found. Attachments: ${list}`);
+
+    const data = part.body?.data
+      ? part.body.data
+      : (await api.users.messages.attachments.get({ userId: 'me', messageId, id: part.body!.attachmentId! })).data.data;
+    const bytes = Buffer.from(data ?? '', 'base64url');
+    const mimeType = (part.mimeType ?? 'application/octet-stream').toLowerCase();
+    const out: FetchedAttachment = {
+      account: acc.email,
+      messageId,
+      partId: part.partId ?? '',
+      filename: part.filename ?? 'attachment',
+      mimeType,
+      size: bytes.length,
+    };
+    const truncate = (t: string) => {
+      out.truncated = t.length > opts.maxChars;
+      return out.truncated ? `${t.slice(0, opts.maxChars)}\n…[truncated]` : t;
+    };
+
+    if (mimeType === 'application/pdf' || out.filename.toLowerCase().endsWith('.pdf')) {
+      try {
+        const t = await pdfText(bytes);
+        if (t) out.text = truncate(t);
+        else out.note = 'The PDF has no text layer (probably scanned). It was saved so you can open it.';
+      } catch (e) {
+        out.note = `Could not read the PDF (${(e as Error).message}). It was saved so you can open it.`;
+      }
+      if (!out.text) out.savedTo = saveAttachment(acc.email, messageId, out.filename, bytes);
+    } else if (TEXT_TYPES.test(mimeType)) {
+      out.text = truncate(bytes.toString('utf8'));
+    } else if (IMAGE_TYPES.test(mimeType) && bytes.length <= MAX_IMAGE_BYTES) {
+      out.image = { data: bytes.toString('base64'), mimeType: mimeType.replace('jpg', 'jpeg') };
+    } else {
+      out.savedTo = saveAttachment(acc.email, messageId, out.filename, bytes);
+      out.note = 'This file type cannot be shown inline, so it was saved.';
+    }
+    if (opts.save && !out.savedTo) out.savedTo = saveAttachment(acc.email, messageId, out.filename, bytes);
+    return out;
+  });
+}
+
+// ---------- labels (opt-in: `add --labels`) ----------
+
+/** Labels this server will not apply: they would move mail to trash or spam. */
+export const FORBIDDEN_LABELS = ['TRASH', 'SPAM'];
+
+function requireLabels(acc: Account) {
+  if (!hasLabelScope(acc)) {
+    throw new Error(
+      `Labels are not enabled for ${acc.email}. Reconnect it with label permission: ` +
+        `npx -y @yybd/multi-mail-mcp add ${acc.email} --labels`
+    );
+  }
+}
+
+/** Map label names (any case) or ids to ids; system labels like UNREAD pass through. */
+export function resolveLabelIds(
+  labels: { id?: string | null; name?: string | null }[],
+  wanted: string[]
+): { ids: string[]; unknown: string[] } {
+  const ids: string[] = [];
+  const unknown: string[] = [];
+  for (const w of wanted) {
+    const t = w.trim();
+    if (!t) continue;
+    const hit =
+      labels.find((l) => l.id === t) ??
+      labels.find((l) => l.name?.toLowerCase() === t.toLowerCase()) ??
+      labels.find((l) => l.id?.toLowerCase() === t.toLowerCase());
+    if (hit?.id) ids.push(hit.id);
+    else unknown.push(t);
+  }
+  return { ids, unknown };
+}
+
+export async function modifyLabels(
+  accountSel: string | undefined,
+  target: { messageIds?: string[]; threadId?: string },
+  add: string[],
+  remove: string[]
+) {
+  const acc = resolveAccount(accountSel);
+  requireLabels(acc);
+  const banned = add.filter((a) => FORBIDDEN_LABELS.includes(a.trim().toUpperCase()));
+  if (banned.length) throw new Error(`Refusing to add ${banned.join(', ')}: this server does not trash or spam mail.`);
+  if (!target.threadId && !target.messageIds?.length) throw new Error('Give message_ids or thread_id.');
+  return call(acc, async (api) => {
+    const labels = (await api.users.labels.list({ userId: 'me' })).data.labels ?? [];
+    const a = resolveLabelIds(labels, add);
+    const r = resolveLabelIds(labels, remove);
+    const unknown = [...a.unknown, ...r.unknown];
+    if (unknown.length) throw new Error(`Unknown label(s): ${unknown.join(', ')}. Create one with create_label, or see list_labels.`);
+    if (target.threadId) {
+      await api.users.threads.modify({
+        userId: 'me',
+        id: target.threadId,
+        requestBody: { addLabelIds: a.ids, removeLabelIds: r.ids },
+      });
+    } else {
+      await api.users.messages.batchModify({
+        userId: 'me',
+        requestBody: { ids: target.messageIds, addLabelIds: a.ids, removeLabelIds: r.ids },
+      });
+    }
+    return {
+      account: acc.email,
+      ...(target.threadId ? { threadId: target.threadId } : { messages: target.messageIds!.length }),
+      added: a.ids,
+      removed: r.ids,
+    };
+  });
+}
+
+export async function createLabel(accountSel: string | undefined, name: string) {
+  const acc = resolveAccount(accountSel);
+  requireLabels(acc);
+  return call(acc, async (api) => {
+    const r = await api.users.labels.create({
+      userId: 'me',
+      requestBody: { name, labelListVisibility: 'labelShow', messageListVisibility: 'show' },
+    });
+    return { account: acc.email, id: r.data.id, name: r.data.name };
+  });
 }

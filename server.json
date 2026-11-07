@@ -8,12 +8,12 @@
     "source": "github"
   },
   "websiteUrl": "https://github.com/yybd/multi-mail-mcp#readme",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@yybd/multi-mail-mcp",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "transport": {
         "type": "stdio"
       },
@@ -27,6 +27,12 @@
         {
           "name": "MULTI_MAIL_HOME",
           "description": "Folder holding credentials.json and account tokens (default ~/.multi-mail)",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "MULTI_MAIL_SEND",
+          "description": "Set to off for drafts-only mode: no tool can send mail",
           "isRequired": false,
           "format": "string"
         }

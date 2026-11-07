@@ -144,6 +144,8 @@ export function htmlToText(html: string): string {
 }
 
 export interface Attachment {
+  /** Pass to get_attachment to fetch this one. Stable for a given message. */
+  partId: string;
   filename: string;
   mimeType: string;
   size: number;
@@ -156,7 +158,7 @@ export function extractBody(payload?: gmail_v1.Schema$MessagePart): { text: stri
   const walk = (p?: gmail_v1.Schema$MessagePart) => {
     if (!p) return;
     if (p.filename && (p.body?.attachmentId || p.body?.size)) {
-      attachments.push({ filename: p.filename, mimeType: p.mimeType ?? '', size: p.body?.size ?? 0 });
+      attachments.push({ partId: p.partId ?? '', filename: p.filename, mimeType: p.mimeType ?? '', size: p.body?.size ?? 0 });
     } else if (p.mimeType === 'text/plain' && p.body?.data && !text) {
       text = decode(p.body.data);
     } else if (p.mimeType === 'text/html' && p.body?.data && !html) {
@@ -166,4 +168,23 @@ export function extractBody(payload?: gmail_v1.Schema$MessagePart): { text: stri
   };
   walk(payload);
   return { text: text.trim() || htmlToText(html), attachments };
+}
+
+/** Every part that carries a file, with the ids needed to download it. */
+export function attachmentParts(payload?: gmail_v1.Schema$MessagePart): gmail_v1.Schema$MessagePart[] {
+  const out: gmail_v1.Schema$MessagePart[] = [];
+  const walk = (p?: gmail_v1.Schema$MessagePart) => {
+    if (!p) return;
+    if (p.filename && (p.body?.attachmentId || p.body?.size)) out.push(p);
+    p.parts?.forEach(walk);
+  };
+  walk(payload);
+  return out;
+}
+
+/** A file name that cannot climb out of a folder or hide as a dotfile. */
+export function safeFilename(name: string): string {
+  const base = name.split(/[\\/]/).pop() ?? '';
+  const clean = base.replace(/[\u0000-\u001f<>:"|?*]/g, '_').replace(/^\.+/, '').trim();
+  return clean.slice(0, 200) || 'attachment';
 }

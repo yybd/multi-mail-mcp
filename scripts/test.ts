@@ -15,10 +15,11 @@ process.env.MULTI_MAIL_HOME = home;
 mkdirSync(join(home, 'accounts'), { recursive: true });
 writeFileSync(join(home, 'credentials.json'), JSON.stringify({ installed: { client_id: 'x', client_secret: 'y' } }));
 for (const [email, alias] of [['me.work@gmail.com', 'work'], ['me.home@gmail.com', 'home']]) {
-  writeFileSync(join(home, 'accounts', `${email}.json`), JSON.stringify({ email, alias, tokens: { refresh_token: 'r' }, added: '2026-11-07' }));
+  writeFileSync(join(home, 'accounts', `${email}.json`), JSON.stringify({ email, alias, tokens: { refresh_token: 'r', ...(alias === 'home' ? { scope: 'https://www.googleapis.com/auth/gmail.modify' } : {}) }, added: '2026-11-07' }));
 }
 
-const { buildRaw, encodeAddress, addressList, extractBody, htmlToText } = await import('../src/mime.js');
+const { buildRaw, encodeAddress, addressList, extractBody, htmlToText, safeFilename } = await import('../src/mime.js');
+const { resolveLabelIds } = await import('../src/gmail.js');
 const { resolveAccount } = await import('../src/config.js');
 
 // --- MIME ---
@@ -38,7 +39,20 @@ assert.deepEqual(addressList('a@x.com, "Smith, J" <j@y.com>; c@z.com'), ['a@x.co
 const html = Buffer.from('<p>שלום&nbsp;<b>עולם</b></p><a href="https://x.y">קישור</a>').toString('base64url');
 assert.equal(extractBody({ mimeType: 'multipart/alternative', parts: [{ mimeType: 'text/html', body: { data: html } }] }).text, 'שלום עולם\nקישור (https://x.y)');
 assert.equal(htmlToText('a &#1488; &amp; b'), 'a א & b');
+const withAtt = extractBody({ mimeType: 'multipart/mixed', parts: [
+  { partId: '0', mimeType: 'text/plain', body: { data: Buffer.from('hi').toString('base64url') } },
+  { partId: '1', mimeType: 'application/pdf', filename: 'חשבונית.pdf', body: { attachmentId: 'A', size: 1234 } },
+] });
+assert.deepEqual(withAtt.attachments, [{ partId: '1', filename: 'חשבונית.pdf', mimeType: 'application/pdf', size: 1234 }]);
+assert.equal(safeFilename('../../etc/passwd'), 'passwd');
+assert.equal(safeFilename('..\\..\\x:y?.pdf'), 'x_y_.pdf');
+assert.equal(safeFilename('.hidden'), 'hidden');
+assert.equal(safeFilename(''), 'attachment');
 console.log('✓ mime');
+
+const labels = [{ id: 'UNREAD', name: 'UNREAD' }, { id: 'INBOX', name: 'INBOX' }, { id: 'Label_7', name: 'Projects/Acme' }];
+assert.deepEqual(resolveLabelIds(labels, ['projects/acme', 'unread', 'Label_7', 'nope']), { ids: ['Label_7', 'UNREAD', 'Label_7'], unknown: ['nope'] });
+console.log('✓ label names');
 
 // --- accounts ---
 assert.equal(resolveAccount('work').email, 'me.work@gmail.com');
@@ -49,7 +63,8 @@ assert.throws(() => resolveAccount('nobody'), /Unknown account/);
 console.log('✓ account selection');
 
 // --- MCP over stdio ---
-const EXPECTED = ['create_draft', 'fetch', 'list_accounts', 'list_drafts', 'list_labels', 'read_email', 'read_thread', 'search', 'search_emails', 'send_draft', 'send_email'];
+const EXPECTED = ['create_draft', 'create_label', 'fetch', 'get_attachment', 'list_accounts', 'list_drafts', 'list_labels', 'modify_labels', 'read_email', 'read_thread', 'search', 'search_emails', 'send_draft', 'send_email'];
+const DRAFTS_ONLY = EXPECTED.filter((t) => !t.startsWith('send_'));
 const env = { ...process.env, MULTI_MAIL_HOME: home } as Record<string, string>;
 const stdio = new Client({ name: 'test', version: '0' });
 await stdio.connect(new StdioClientTransport({ command: 'npx', args: ['tsx', 'src/server.ts'], env }));
@@ -60,8 +75,25 @@ assert.match((accs.content as any)[0].text, /me\.work@gmail\.com/);
 const noAcc = await stdio.callTool({ name: 'read_email', arguments: { message_id: 'x' } });
 assert.equal(noAcc.isError, true);
 assert.match((noAcc.content as any)[0].text, /Several accounts/);
+const lbl = await stdio.callTool({ name: 'modify_labels', arguments: { account: 'work', message_ids: ['x'], remove: ['UNREAD'] } });
+assert.equal(lbl.isError, true);
+assert.match((lbl.content as any)[0].text, /Labels are not enabled .*--labels/);
+const trash = await stdio.callTool({ name: 'modify_labels', arguments: { account: 'home', message_ids: ['x'], add: ['trash'] } });
+assert.equal(trash.isError, true);
+assert.match((trash.content as any)[0].text, /Refusing to add trash/);
 await stdio.close();
-console.log('✓ stdio:', tools.length, 'tools');
+console.log('✓ stdio:', tools.length, 'tools; labels need --labels; TRASH refused');
+
+// --- drafts-only: the send tools are not there at all ---
+for (const how of [{ args: ['tsx', 'src/main.ts', '--drafts-only'], env }, { args: ['tsx', 'src/main.ts'], env: { ...env, MULTI_MAIL_SEND: 'off' } }]) {
+  const c = new Client({ name: 'test', version: '0' });
+  await c.connect(new StdioClientTransport({ command: 'npx', args: how.args, env: how.env }));
+  assert.deepEqual((await c.listTools()).tools.map((t) => t.name).sort(), DRAFTS_ONLY);
+  const acc = JSON.parse(((await c.callTool({ name: 'list_accounts', arguments: {} })).content as any)[0].text);
+  assert.equal(acc.sending, 'off (drafts only)');
+  await c.close();
+}
+console.log('✓ drafts-only (flag and env): no send tools');
 
 // --- MCP over HTTP ---
 const TOKEN = 'test-token-0123456789-abcdefghij';

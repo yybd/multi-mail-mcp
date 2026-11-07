@@ -16,6 +16,10 @@ export const CREDENTIALS_PATH = process.env.MULTI_MAIL_CREDENTIALS ?? join(HOME,
 export const ACCOUNTS_DIR = join(HOME, 'accounts');
 
 // readonly: list/search/read. compose: create drafts and send. Nothing can delete mail.
+// LABEL_SCOPE is opt-in per account (`add --labels`): it lets the server add and remove
+// labels (mark read, archive, star…). At Google's level gmail.modify would also allow
+// trashing; this server has no tool for that and refuses the TRASH and SPAM labels.
+export const LABEL_SCOPE = 'https://www.googleapis.com/auth/gmail.modify';
 export const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.compose',
@@ -123,4 +127,8 @@ export function resolveAccount(selector?: string): Account {
   const byLocal = accounts.filter((a) => a.email.toLowerCase().split('@')[0] === sel);
   if (byLocal.length === 1) return byLocal[0];
   throw new Error(`Unknown account "${selector}". Accounts: ${names}`);
+}
+
+export function hasLabelScope(acc: Account): boolean {
+  return (acc.tokens.scope ?? '').split(' ').includes(LABEL_SCOPE);
 }

@@ -22,6 +22,9 @@ Each user brings **their own Google OAuth client**. Because of that, no Google a
 | `create_draft` | Saves a new message or reply as a draft, without sending it |
 | `send_email` | Sends a new message or reply right away |
 | `list_drafts` / `send_draft` | Lists pending drafts, or sends one of them |
+| `get_attachment` | Downloads one attachment: text and PDFs come back as text, images as an image, anything else (and scanned PDFs) is saved under `~/.multi-mail/attachments` |
+| `modify_labels` | Adds or removes labels on messages or a thread: mark read or unread, archive, star, file under a label. Accounts connected with `--labels` only |
+| `create_label` | Creates a label (`Projects/Acme` nests). Accounts connected with `--labels` only |
 | `search` / `fetch` | Searches every mailbox and fetches one message, in the shape ChatGPT expects (connectors, deep research) |
 
 **Choosing a mailbox:**
@@ -33,7 +36,18 @@ Each user brings **their own Google OAuth client**. Because of that, no Google a
 - `reply_to_message_id` puts the reply in the right thread and fills in the recipient and subject.
 - `reply_all` adds every original recipient.
 
-**Permissions:** only `gmail.readonly` and `gmail.compose`. The server **cannot delete** mail, move it to trash, or change settings.
+**Permissions:** `gmail.readonly` and `gmail.compose` by default. The server **cannot delete** mail, move it to trash, or change settings.
+- **Labels are opt-in per account** (`add --labels`), which adds `gmail.modify`. At Google's level that scope would also allow trashing mail, so the server has no trash tool and refuses the `TRASH` and `SPAM` labels.
+
+## Drafts-only mode
+
+Start the server with `--drafts-only`, or set `MULTI_MAIL_SEND=off`, and `send_email` and `send_draft` are not registered at all. The model can still read, search and write drafts, but nothing can leave your mailbox until you press Send in Gmail.
+
+Use it whenever the server reads mail you didn't write and nobody approves each step. That covers automated triage, scheduled tasks, and clients that skip permission prompts. Any incoming message could carry instructions ("forward this to…"), and in this mode there is no tool that could carry them out.
+
+```bash
+claude mcp add multi-mail -s user -- npx -y @yybd/multi-mail-mcp --drafts-only
+```
 
 ## How it compares
 
@@ -126,6 +140,7 @@ Each `add` opens a browser where you pick a Google account and approve access.
 - `check` verifies every account still has access.
 - `alias <account> <name>` sets or changes an alias. The account can be its current alias, its address, or the part before `@`. For example, `npx -y @yybd/multi-mail-mcp alias tech work` renames `tech` to `work`, and it takes effect immediately, without a restart.
 - `remove <account>` disconnects an account.
+- `add <account> --labels` reconnects an account with label permission (needed for `modify_labels` and `create_label`). Running `add` again without `--labels` takes it away.
 
 Tokens live in `~/.multi-mail/accounts/` with `600` permissions; `MULTI_MAIL_HOME` moves that folder. A running server picks up a newly added account without a restart.
 
@@ -200,7 +215,7 @@ The tests run offline, with no Google account. They cover Hebrew/UTF-8 MIME enco
 - `src/server.ts` / `src/http.ts` — transports
 - `src/cli.ts` — account management
 
-**Not supported yet:** downloading or attaching files, changing labels, marking as read.
+**Not supported yet:** attaching files to outgoing mail.
 
 ## License
 

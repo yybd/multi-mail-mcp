@@ -15,8 +15,10 @@ import { gmail as gmailApi } from '@googleapis/gmail';
 import {
   ACCOUNTS_DIR,
   CREDENTIALS_PATH,
+  LABEL_SCOPE,
   SCOPES,
   ensureHome,
+  hasLabelScope,
   listAccounts,
   loadClientSecrets,
   removeAccount,
@@ -37,7 +39,7 @@ function openBrowser(url: string) {
 }
 
 /** Loopback OAuth: a one-shot local web server catches Google's redirect. */
-async function authorize(loginHint?: string): Promise<{ tokens: any }> {
+async function authorize(loginHint: string | undefined, scopes: string[]): Promise<{ tokens: any }> {
   const state = randomBytes(16).toString('hex');
   loadClientSecrets(); // fail here, with a clear message, before opening anything
   return new Promise((resolve, reject) => {
@@ -54,7 +56,7 @@ async function authorize(loginHint?: string): Promise<{ tokens: any }> {
       const url = client.generateAuthUrl({
         access_type: 'offline',
         prompt: 'consent select_account', // consent → always get a refresh token
-        scope: SCOPES,
+        scope: scopes,
         state,
         login_hint: loginHint,
         include_granted_scopes: false,
@@ -77,7 +79,7 @@ async function authorize(loginHint?: string): Promise<{ tokens: any }> {
           const code = u.searchParams.get('code');
           if (!code) throw new Error('No authorization code in the redirect.');
           const granted = (u.searchParams.get('scope') ?? '').split(' ');
-          const missing = SCOPES.filter((s) => !granted.includes(s));
+          const missing = scopes.filter((s) => !granted.includes(s));
           if (missing.length) throw new Error(`Not all permissions were granted (missing: ${missing.join(', ')}). Tick every box on the consent screen.`);
           const { tokens } = await client.getToken(code);
           finish(200, '✅ Connected');
@@ -98,9 +100,9 @@ async function authorize(loginHint?: string): Promise<{ tokens: any }> {
   });
 }
 
-async function add(hint?: string, alias?: string) {
+async function add(hint: string | undefined, alias: string | undefined, labels: boolean) {
   ensureHome();
-  const { tokens } = await authorize(hint);
+  const { tokens } = await authorize(hint, labels ? [...SCOPES, LABEL_SCOPE] : SCOPES);
   if (!tokens.refresh_token) {
     throw new Error(
       'Google did not return a refresh token. Remove the app at https://myaccount.google.com/permissions and run add again.'
@@ -118,7 +120,7 @@ async function add(hint?: string, alias?: string) {
     added: prev?.added ?? new Date().toISOString(),
   };
   saveAccount(acc);
-  console.log(`${prev ? 'Reconnected' : 'Connected'} ${email}${acc.alias ? ` (alias: ${acc.alias})` : ''} — ${profile.messagesTotal} messages.`);
+  console.log(`${prev ? 'Reconnected' : 'Connected'} ${email}${acc.alias ? ` (alias: ${acc.alias})` : ''}${labels ? ', labels enabled' : ''} — ${profile.messagesTotal} messages.`);
 }
 
 async function check() {
@@ -127,7 +129,7 @@ async function check() {
   for (const a of accounts) {
     try {
       const p = await getProfile(a);
-      console.log(`✓ ${a.email}${a.alias ? ` (${a.alias})` : ''} — ${p.messagesTotal} messages`);
+      console.log(`✓ ${a.email}${a.alias ? ` (${a.alias})` : ''}${hasLabelScope(a) ? ' [labels]' : ''} — ${p.messagesTotal} messages`);
     } catch (e) {
       console.log(`✗ ${a.email} — ${(e as Error).message}`);
     }
@@ -137,7 +139,7 @@ async function check() {
 function list() {
   const accounts = listAccounts();
   if (!accounts.length) return console.log(`No accounts connected yet. Run: npx -y @yybd/multi-mail-mcp add\n(credentials: ${CREDENTIALS_PATH})`);
-  for (const a of accounts) console.log(`${a.email}${a.alias ? `  alias=${a.alias}` : ''}  added=${a.added.slice(0, 10)}`);
+  for (const a of accounts) console.log(`${a.email}${a.alias ? `  alias=${a.alias}` : ''}${hasLabelScope(a) ? '  labels' : ''}  added=${a.added.slice(0, 10)}`);
   console.log(`\n${accounts.length} account(s) in ${ACCOUNTS_DIR}`);
 }
 
@@ -148,8 +150,11 @@ Usage: npx -y @yybd/multi-mail-mcp [command]
 
   (no command)                 run the MCP server over stdio (Claude Desktop / Claude Code)
   http                         run the Streamable HTTP server (needs MCP_AUTH_TOKEN)
+  --drafts-only                with either of the above: no tool can send mail
 
-  add [email] [--alias name]   connect an account (browser sign-in)
+  add [email] [--alias name] [--labels]
+                               connect an account (browser sign-in); --labels also allows
+                               adding/removing labels (mark read, archive, star)
   list                         list connected accounts
   check                        verify every account still has access
   alias <account> <name>       set or change an alias ("work", "home"…)
@@ -173,7 +178,9 @@ try {
   switch (cmd) {
     case 'add': {
       const alias = flag('alias');
-      await add(rest[0], alias);
+      const li = rest.indexOf('--labels');
+      if (li >= 0) rest.splice(li, 1);
+      await add(rest[0], alias, li >= 0);
       break;
     }
     case 'list':
