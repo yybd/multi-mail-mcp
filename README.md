@@ -97,7 +97,7 @@ You need Node.js 20 or newer. There's nothing to install: every command below ru
 git clone https://github.com/yybd/multi-mail-mcp.git multi-mail && cd multi-mail && npm install && npm run build
 ```
 
-Then use `node dist/main.js` wherever this guide says `npx -y @yybd/multi-mail-mcp`.
+Then use `node dist/main.js` wherever this guide says `npx -y @yybd/multi-mail-mcp`. Inside the source folder, `npx -y @yybd/multi-mail-mcp` fails with *command not found*: npx sees that the folder is the package itself and doesn't download it. Run npx from any other folder, or use `npm run cli -- list` there.
 </details>
 
 ### 1. Create your own Google OAuth client (once)

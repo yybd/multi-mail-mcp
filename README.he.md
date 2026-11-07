@@ -88,7 +88,7 @@ claude mcp add multi-mail -s user -- npx -y @yybd/multi-mail-mcp --drafts-only
 git clone https://github.com/yybd/multi-mail-mcp.git multi-mail && cd multi-mail && npm install && npm run build
 ```
 
-ואז בכל מקום שכתוב בו `npx -y @yybd/multi-mail-mcp`, משתמשים ב-`node dist/main.js`.
+ואז בכל מקום שכתוב בו `npx -y @yybd/multi-mail-mcp`, משתמשים ב-`node dist/main.js`. בתוך תיקיית המקור, `npx -y @yybd/multi-mail-mcp` נכשל עם *command not found*, כי npx מזהה שהתיקייה היא החבילה עצמה ולא מוריד אותה. מריצים npx מכל תיקייה אחרת, או משתמשים שם ב-`npm run cli -- list`.
 </details>
 
 כל משתמש יוצר OAuth client משלו בחשבון הגוגל שלו (שלב 1). כך אין צורך באימות של גוגל, והטוקנים לא עוברים דרך אף צד שלישי.
