@@ -10,6 +10,8 @@ It has two transports:
 
 Each user brings **their own Google OAuth client**. Because of that, no Google app verification is needed and nothing passes through a third party. Mail goes only between your machine and Google.
 
+The story behind it, with the comparison and examples: **[One MCP server for every Gmail account, in Claude and ChatGPT](https://www.bdtech.app/blog/multi-mail?utm_source=github)**.
+
 ## Tools
 
 | Tool | What it does |

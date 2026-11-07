@@ -7,6 +7,8 @@
 - **stdio** (`dist/server.js`) — ל-Claude Desktop ול-Claude Code, רץ מקומית.
 - **Streamable HTTP** (`dist/http.js`) — ל-ChatGPT (ולכל לקוח שמתחבר ב-URL), מוגן בטוקן.
 
+הסיפור שמאחוריו, עם ההשוואה והדוגמאות: **[שרת MCP אחד לכל חשבונות ה-Gmail, ב-Claude וב-ChatGPT](https://www.bdtech.app/he/blog/multi-mail?utm_source=github)**.
+
 ## כלים
 
 | כלי | מה עושה |
