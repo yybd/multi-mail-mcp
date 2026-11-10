@@ -1,5 +1,12 @@
 *English · [עברית](README.he.md)*
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/wordmark-dark.svg">
+    <img src="docs/assets/wordmark-light.svg" alt="multi-mail MCP" width="520">
+  </picture>
+</p>
+
 # multi-mail MCP
 
 An MCP server for **several Gmail accounts at once**. It searches, reads, drafts and sends mail, and works with **Claude Desktop**, **Claude Code** and **ChatGPT**.

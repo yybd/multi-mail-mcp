@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" role="img" aria-label="multi-mail — one MCP server for several Gmail accounts">
+  <title>multi-mail MCP</title>
+  <defs>
+    <linearGradient id="page" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#171D24"/>
+      <stop offset="1" stop-color="#0C0F13"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#4F9DFF" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#4F9DFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1F2730"/>
+      <stop offset="1" stop-color="#12171C"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="url(#page)"/>
+  <circle cx="270" cy="300" r="300" fill="url(#glow)"/>
+
+  <!-- icon -->
+  <g transform="translate(110 150) scale(0.625)">
+    <rect x="3" y="3" width="506" height="506" rx="113" fill="url(#bg)" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="6"/>
+    <!-- three mailboxes behind one another; the one in front is the one being answered -->
+    <g transform="translate(256 200) scale(0.82) translate(-260 -256)">
+      <rect x="164" y="126" width="260" height="180" rx="28" fill="#3A4756" stroke="#151B21" stroke-width="12"/>
+      <rect x="130" y="166" width="260" height="180" rx="28" fill="#93A3B5" stroke="#151B21" stroke-width="12"/>
+      <rect x="96" y="206" width="260" height="180" rx="28" fill="#4F9DFF" stroke="#151B21" stroke-width="12"/>
+      <path d="M124 240 L226 316 L328 240" fill="none" stroke="#101418" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <!-- the letters MCP, drawn as strokes so no font is needed -->
+    <g fill="none" stroke="#F4F4F0" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M142 432 V368 L174 408 L206 368 V432"/>
+      <path d="M290.6 377.4 A32 32 0 1 0 290.6 422.6"/>
+      <path d="M321 432 V368 H347 A20 20 0 0 1 347 408 H321"/>
+    </g>
+  </g>
+
+  <g font-family="-apple-system, 'SF Pro Display', 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="510" y="262" font-size="96" font-weight="800" letter-spacing="-3" fill="#F4F4F0">multi<tspan fill="#4F9DFF">-</tspan>mail <tspan font-weight="500" fill="#8E99A5" letter-spacing="0">MCP</tspan></text>
+    <text x="514" y="320" font-size="31" font-weight="500" fill="#C3CAD2">One MCP server for several Gmail accounts</text>
+    <text x="514" y="372" font-size="34" font-weight="600" fill="#4F9DFF">Claude Desktop · Claude Code · ChatGPT</text>
+
+    <!-- feature chips -->
+    <g font-size="22" font-weight="600" fill="#E6E9EC">
+      <rect x="514" y="414" width="322" height="44" rx="22" fill="#FFFFFF" fill-opacity="0.07" stroke="#FFFFFF" stroke-opacity="0.14"/>
+      <text x="675" y="443" text-anchor="middle">Search · read · draft · send</text>
+      <rect x="850" y="414" width="168" height="44" rx="22" fill="#FFFFFF" fill-opacity="0.07" stroke="#FFFFFF" stroke-opacity="0.14"/>
+      <text x="934" y="443" text-anchor="middle">Attachments</text>
+      <rect x="514" y="470" width="110" height="44" rx="22" fill="#FFFFFF" fill-opacity="0.07" stroke="#FFFFFF" stroke-opacity="0.14"/>
+      <text x="569" y="499" text-anchor="middle">Labels</text>
+      <rect x="638" y="470" width="208" height="44" rx="22" fill="#FFFFFF" fill-opacity="0.07" stroke="#FFFFFF" stroke-opacity="0.14"/>
+      <text x="742" y="499" text-anchor="middle">Google Calendar</text>
+      <rect x="860" y="470" width="226" height="44" rx="22" fill="#FFFFFF" fill-opacity="0.07" stroke="#FFFFFF" stroke-opacity="0.14"/>
+      <text x="973" y="499" text-anchor="middle">Open source · MIT</text>
+    </g>
+
+    <text x="514" y="574" font-size="22" font-weight="500" fill="#7F8A96">github.com/yybd/multi-mail-mcp</text>
+  </g>
+</svg>

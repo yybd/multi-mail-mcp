@@ -1,5 +1,12 @@
 *[English](README.md) · עברית*
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/wordmark-dark.svg">
+    <img src="docs/assets/wordmark-light.svg" alt="multi-mail MCP" width="520">
+  </picture>
+</p>
+
 # multi-mail MCP
 
 שרת MCP לכמה תיבות Gmail במקביל — חיפוש, קריאה, טיוטות ושליחה — עבור **Claude Desktop**, **Claude Code** ו-**ChatGPT**.
